@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::Deref;
 
 use actix_web::{
@@ -7,6 +8,12 @@ use actix_web::{
     HttpResponse,
     Responder
 };
+
+use actix_web::cookie::{Cookie, Expiration, time::OffsetDateTime, time::Duration, SameSite};
+
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use jwt::SignWithKey;
 
 use sea_orm::{EntityTrait};
 use sea_orm::entity::prelude::*;
@@ -62,23 +69,62 @@ pub async fn user_login(state: web::Data<State>,
     if user.is_err() {
         eprintln!("Error: {}", user.unwrap_err());
         println!("POST /api/user/login 401");
-        return HttpResponse::InternalServerError();
+        return HttpResponse::InternalServerError().body("Internal server error");
     }
 
     let user = user.unwrap();
     if user.is_none() {
         println!("POST /api/user/login 401");
-        return HttpResponse::Unauthorized();
+        return HttpResponse::Unauthorized().body("Invalid credentials");
     }
 
     let user = user.unwrap();
-    if form.password != user.password {
+
+    let verify = bcrypt::verify(form.password, &user.password).unwrap_or_else(|err| {
+        eprintln!("Error: {}", err);
+        false
+    });
+
+    if !verify {
         println!("POST /api/user/login 401");
-        return HttpResponse::Unauthorized();
+        return HttpResponse::Unauthorized().body("Invalid credentials");
     }
 
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|err| {
+        eprintln!("Error: {}", err);
+        std::process::exit(1);
+    });
+    let key: Hmac<Sha256> = Hmac::new_from_slice(secret.as_bytes()).unwrap();
+
+    let mut claims = BTreeMap::new();
+    claims.insert("id", user.id.to_string());
+    claims.insert("name", user.name);
+    claims.insert("email", user.email);
+
+    let token = claims.sign_with_key(&key);
+    if token.is_err() {
+        eprintln!("Error: {}", token.unwrap_err());
+        println!("POST /api/user/login 500");
+        return HttpResponse::InternalServerError().body("Internal server error");
+    }
+
+    let token = token.unwrap();
+
+    let exp =
+        Expiration::from( OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600));
+
+    let cookie = Cookie::build("jwt", token)
+        .domain("localhost")
+        .path("/")
+        .expires(exp)
+        .max_age(Duration::hours(1))
+        .http_only(true)
+        .secure(false)
+        .same_site(SameSite::Lax)
+        .finish();
+
     println!("POST /api/user/login 200");
-    HttpResponse::Ok()
+    HttpResponse::Ok().cookie(cookie).body("Logged in")
 }
 
 #[get("/user/me")]

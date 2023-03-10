@@ -39,6 +39,7 @@ async fn main() -> std::io::Result<()> {
                 .service(handlers::user_create)
                 .service(handlers::user_me)
                 .service(handlers::user_profile)
+                .service(handlers::user_login)
             )
     })
         .bind(("127.0.0.1", 7100))?
