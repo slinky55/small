@@ -18,6 +18,12 @@ pub struct NewUser {
     pub password: String,
 }
 
+#[derive(serde::Deserialize)]
+pub struct FormCreds {
+    pub email: String,
+    pub password: String,
+}
+
 pub async fn save_user(db: &DatabaseConnection, user: web::Json<NewUser>) -> Result<(), DbErr> {
     let user = user.into_inner();
     
