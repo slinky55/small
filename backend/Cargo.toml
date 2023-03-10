@@ -13,3 +13,6 @@ entity = { path = "entity" }
 migration = { path = "migration" } # depends on your needs
 actix-web = "4.3.1"
 sea-orm = { version = "0.11.0", features = [ "sqlx-mysql", "runtime-async-std-native-tls", "macros" ] }
+serde = { version = "1.0.154", features = [ "derive" ] }
+serde_json = "1.0.94"
+dotenv = "0.15.0"

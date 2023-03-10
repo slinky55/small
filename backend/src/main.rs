@@ -1,32 +1,44 @@
+use std::sync::Mutex;
+use std::env;
+
 use actix_web::{
-    get,
-    post,
     web,
     App,
-    HttpResponse,
     HttpServer,
-    Responder
 };
 
-#[get("/ping")]
-async fn ping() -> impl Responder {
-    println!("GET /api/ping 200");
-    HttpResponse::Ok().body("pong")
-}
+use sea_orm::Database;
 
-#[post("/user/create")]
-async fn user_create() -> impl Responder {
-    println!("POST /api/user/create 200");
-    HttpResponse::Ok().body("user created")
-}
+use backend::{
+    State,
+    handlers
+};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    dotenv::dotenv().ok();
+
+    let url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        eprintln!("DATABASE_URL is not set");
+        std::process::exit(1);
+    });
+
+    let db = web::Data::new(State {
+        db: Mutex::new(Database::connect(&url).await.unwrap_or_else(|err| {
+           eprintln!("Failed to connect to database: {}", err);
+           std::process::exit(1);
+        }))
+    });
+
+    HttpServer::new(move || {
         App::new()
+            .app_data(db.clone())
             .service(
                 web::scope("/api")
-                .service(ping)
+                .service(handlers::ping)
+                .service(handlers::user_create)
+                .service(handlers::user_me)
+                .service(handlers::user_profile)
             )
     })
         .bind(("127.0.0.1", 7100))?
