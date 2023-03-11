@@ -1,10 +1,21 @@
 use std::sync::Mutex;
 use std::env;
 
+use chrono;
+
+use actix_session::{
+    Session,
+    SessionMiddleware,
+    storage::RedisActorSessionStore
+};
+
+
 use actix_web::{
     web,
     App,
     HttpServer,
+    middleware,
+    cookie::Key
 };
 
 use sea_orm::Database;
@@ -23,6 +34,8 @@ async fn main() -> std::io::Result<()> {
         std::process::exit(1);
     });
 
+    let secret = Key::generate();
+
     let db = web::Data::new(State {
         db: Mutex::new(Database::connect(&url).await.unwrap_or_else(|err| {
            eprintln!("Failed to connect to database: {}", err);
@@ -33,6 +46,14 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(db.clone())
+            .app_data(web::JsonConfig::default().limit(4096))
+            .wrap(middleware::Logger::default())
+            .wrap(
+                SessionMiddleware::new(
+                    RedisActorSessionStore::new("127.0.0.1:6379"),
+                    secret.clone()
+                    )
+            )
             .service(
                 web::scope("/api")
                 .service(handlers::ping)

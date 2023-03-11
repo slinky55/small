@@ -2,6 +2,8 @@ pub mod handlers;
 
 use std::sync::Mutex;
 use actix_web::web;
+use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr};
 
@@ -22,6 +24,12 @@ pub struct NewUser {
 pub struct FormCreds {
     pub email: String,
     pub password: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct SessionData {
+    pub id: i32,
+    pub name: String,
 }
 
 pub async fn save_user(db: &DatabaseConnection,
@@ -49,11 +57,15 @@ pub async fn save_user(db: &DatabaseConnection,
 pub fn hash_str(s: &str) -> Option<String> {
     let bytes = s.as_bytes();
 
-    let hash = bcrypt::hash(bytes, bcrypt::DEFAULT_COST);
+    let argon = Argon2::default();
+    let salt = SaltString::generate(&mut OsRng);
+
+    let hash = argon.hash_password(bytes, &salt);
+
     if hash.is_err() {
         eprintln!("Failed to hash password: {}", hash.unwrap_err());
         return None;
     }
 
-    Some(hash.unwrap())
+    Some(hash.unwrap().to_string())
 }
