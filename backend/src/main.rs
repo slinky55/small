@@ -72,6 +72,10 @@ async fn main() -> std::io::Result<()> {
                 .service(handlers::user_profile)
                 .service(handlers::user_login)
                 .service(handlers::user_logout)
+                .service(handlers::post_create)
+                .service(handlers::post_get)
+                .service(handlers::user_posts)
+                .service(handlers::post_get_id)
             )
     })
         .bind(("localhost", 7100))?

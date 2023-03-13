@@ -1,15 +1,17 @@
 <script lang="ts">
     import {getContext} from "svelte";
+    import type { PageData } from './$types';
+    import PostFeed from "$lib/PostFeed.svelte";
+
+    export let data: PageData;
+
+    $: posts = data.posts;
 
     const { user, loggedIn } = getContext("auth");
-
-    console.log(user);
 </script>
 
 {#if $loggedIn}
-    <h1>Dashboard</h1>
-    <p>Welcome, {$user.name}!</p>
+    <PostFeed posts={posts} />
 {:else}
-    <h1>Not logged in</h1>
-    <p>You need to be logged in to see this page.</p>
+    <h1>Welcome Guest</h1>
 {/if}

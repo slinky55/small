@@ -1,34 +1,52 @@
 <script lang="ts">
     import {goto} from "$app/navigation";
-    import {getContext} from "svelte";
-
-    const { login } = getContext("auth");
 
     async function submitForm(e: any) {
         e.preventDefault();
 
-        const email = e.target.email.value;
-        const password = e.target.password.value;
+        const title = e.target.title.value;
+        const content = e.target.content.value;
 
-        await login(email, password);
+        const res = await fetch("http://localhost:7100/api/post/create", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                title,
+                content,
+            }),
+            credentials: "include",
+        });
+
+        if (!res.ok) {
+            error = "failed to create post";
+            return;
+        }
 
         await goto("/");
     }
+
+    $: error = null;
 </script>
 
 <div>
     <form on:submit={submitForm}>
         <label>
-            email
-            <input type="email" name="email" />
+            title
+            <input type="text" name="title" />
         </label>
         <label>
-            password
-            <input type="password" name="password" />
+            content
+            <textarea name="content"></textarea>
         </label>
         <button type="submit">Submit</button>
     </form>
 </div>
+
+{#if error}
+    <span style="color: red">{error}</span>
+{/if}
 
 <style>
     div {
@@ -57,6 +75,17 @@
 
         border: 1px solid #ccc;
         border-radius: 4px;
+    }
+
+    textarea {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+
+        border: 1px solid #ccc;
+        border-radius: 4px;
+
+        height: 10rem;
+        resize: vertical;
     }
 
     button {

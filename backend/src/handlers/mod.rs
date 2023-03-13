@@ -14,10 +14,19 @@ use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use sea_orm::{EntityTrait};
 use sea_orm::entity::prelude::*;
 
-use entity::prelude::User;
+use entity::prelude::{Post, User};
 use entity::user;
 
-use crate::{NewUser, FormCreds, save_user, State, SessionData, JsonError};
+use crate::{
+    NewUser,
+    NewPost,
+    FormCreds,
+    save_user,
+    save_post,
+    State,
+    SessionData,
+    JsonError
+};
 
 #[get("/ping")]
 pub async fn ping() -> impl Responder {
@@ -169,7 +178,7 @@ pub async fn user_me(session: Session) -> impl Responder {
 
 #[get("/user/profile/{id}")]
 pub async fn user_profile(path: web::Path<i32>,
-                      state: web::Data<State>) -> impl Responder
+                          state: web::Data<State>) -> impl Responder
 {
     let id = path.into_inner();
     let db = state.db.lock().unwrap();
@@ -183,6 +192,152 @@ pub async fn user_profile(path: web::Path<i32>,
         },
         Err(err) => {
             println!("GET /api/user/profile/{} 500", id);
+            HttpResponse::InternalServerError().body(err.to_string())
+        }
+    }
+}
+
+#[get("/user/posts")]
+pub async fn user_posts(session: Session,
+                        state: web::Data<State>) -> impl Responder
+{
+    let db = state.db.lock().unwrap();
+
+    let id = match session.get::<i32>("id") {
+        Ok(id) => {
+            if id.is_none() {
+                println!("GET /api/user/me 401");
+                return HttpResponse::Unauthorized().json(JsonError {
+                    error: "Unauthorized".to_string()
+                })
+            }
+            id.unwrap()
+        },
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            println!("GET /api/user/me 401");
+            return HttpResponse::Unauthorized().json(JsonError {
+                error: "Unauthorized".to_string()
+            })
+        }
+    };
+
+    let user = match User::find_by_id(id).one(db.deref()).await {
+        Ok(model) => {
+            if model.is_none() {
+                println!("GET /api/user/me 401");
+                return HttpResponse::Unauthorized().json(JsonError {
+                    error: "Unauthorized".to_string()
+                })
+            }
+            model.unwrap()
+        },
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            println!("GET /api/user/me 401");
+            return HttpResponse::Unauthorized().json(JsonError {
+                error: "Unauthorized".to_string()
+            })
+        }
+    };
+
+    let posts = user.find_related(Post).all(db.deref()).await;
+
+    match posts {
+        Ok(posts) => {
+            println!("GET /api/user/posts 200");
+            HttpResponse::Ok().json(posts)
+        },
+        Err(err) => {
+            println!("GET /api/user/posts 500");
+            HttpResponse::InternalServerError().body(err.to_string())
+        }
+    }
+}
+
+
+#[post("/post/create")]
+pub async fn post_create(session: Session,
+                         state: web::Data<State>,
+                         post: web::Json<NewPost>) -> impl Responder
+{
+    let db = state.db.lock().unwrap();
+
+    let id = match session.get::<i32>("id") {
+        Ok(id) => {
+            if id.is_none() {
+                println!("GET /api/user/me 401");
+                return HttpResponse::Unauthorized().json(JsonError {
+                    error: "Unauthorized".to_string()
+                })
+            }
+            id.unwrap()
+        },
+        Err(err) => {
+            eprintln!("Error: {}", err);
+            println!("GET /api/user/me 401");
+            return HttpResponse::Unauthorized().json(JsonError {
+                error: "Unauthorized".to_string()
+            })
+        }
+    };
+
+    let res = save_post(&db, post, id).await;
+
+    match res {
+        Ok(_) => {
+            println!("POST /api/post/create 200");
+            HttpResponse::Ok().body("Post created")
+        },
+        Err(err) => {
+            println!("Error: {}", err);
+            println!("POST /api/post/create 500");
+            HttpResponse::InternalServerError().body(err.to_string())
+        }
+    }
+}
+
+#[get("/post/get")]
+pub async fn post_get(state: web::Data<State>) -> impl Responder {
+    let db = state.db.lock().unwrap();
+
+    let posts = Post::find().all(db.deref()).await;
+
+    match posts {
+        Ok(posts) => {
+            println!("GET /api/post/get 200");
+            HttpResponse::Ok().json(posts)
+        },
+        Err(err) => {
+            println!("Error: {}", err);
+            println!("GET /api/post/get 500");
+            HttpResponse::InternalServerError().body(err.to_string())
+        }
+    }
+}
+
+#[get("/post/get/{id}")]
+pub async fn post_get_id(state: web::Data<State>,
+                         path: web::Path<i32>) -> impl Responder
+{
+    let db = state.db.lock().unwrap();
+
+    let id = path.into_inner();
+
+    let post = Post::find_by_id(id).one(db.deref()).await;
+
+    match post {
+        Ok(post) => {
+            if post.is_none() {
+                println!("GET /api/post/get/{} 404", id);
+                return HttpResponse::NotFound().body("Post not found")
+            }
+            println!("GET /api/post/get/{} 200", id);
+            HttpResponse::Ok().json(post.unwrap())
+        },
+        Err(err) => {
+            println!("Error: {}", err);
+            println!("GET /api/post/get/{} 500", id);
             HttpResponse::InternalServerError().body(err.to_string())
         }
     }

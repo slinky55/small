@@ -7,7 +7,7 @@ use argon2::{Argon2};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr};
 
-use entity::user;
+use entity::{post, user};
 
 pub struct State {
     pub db: Mutex<DatabaseConnection>
@@ -18,6 +18,12 @@ pub struct NewUser {
     pub name: String,
     pub email: String,
     pub password: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct NewPost {
+    pub title: String,
+    pub content: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -60,6 +66,24 @@ pub async fn save_user(db: &DatabaseConnection,
     };
 
     user.save(db).await?;
+
+    Ok(())
+}
+
+pub async fn save_post(db: &DatabaseConnection,
+                       post: web::Json<NewPost>,
+                       id: i32) -> Result<(), DbErr>
+{
+    let post = post.into_inner();
+
+    let post = post::ActiveModel {
+        title: Set(post.title),
+        text: Set(post.content),
+        user_id: Set(id),
+        ..Default::default()
+    };
+
+    post.save(db).await?;
 
     Ok(())
 }
