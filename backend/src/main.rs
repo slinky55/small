@@ -1,22 +1,21 @@
 use std::sync::Mutex;
 use std::env;
 
-use chrono;
-
 use actix_session::{
-    Session,
     SessionMiddleware,
     storage::RedisActorSessionStore
 };
 
-
 use actix_web::{
+    http,
     web,
     App,
     HttpServer,
     middleware,
     cookie::Key
 };
+
+use actix_cors::Cors;
 
 use sea_orm::Database;
 
@@ -44,15 +43,26 @@ async fn main() -> std::io::Result<()> {
     });
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("http://localhost:5173")
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![http::header::CONTENT_TYPE, http::header::ACCEPT])
+            .allowed_header(http::header::AUTHORIZATION)
+            .allowed_headers(vec![http::header::COOKIE, http::header::SET_COOKIE])
+            .supports_credentials()
+            .max_age(3600);
+
+
         App::new()
             .app_data(db.clone())
             .app_data(web::JsonConfig::default().limit(4096))
+            .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap(
                 SessionMiddleware::new(
                     RedisActorSessionStore::new("127.0.0.1:6379"),
                     secret.clone()
-                    )
+                )
             )
             .service(
                 web::scope("/api")
@@ -61,9 +71,10 @@ async fn main() -> std::io::Result<()> {
                 .service(handlers::user_me)
                 .service(handlers::user_profile)
                 .service(handlers::user_login)
+                .service(handlers::user_logout)
             )
     })
-        .bind(("127.0.0.1", 7100))?
+        .bind(("localhost", 7100))?
         .run()
         .await
 }

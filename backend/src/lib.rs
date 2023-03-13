@@ -3,7 +3,7 @@ pub mod handlers;
 use std::sync::Mutex;
 use actix_web::web;
 use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::{Argon2};
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr};
 
@@ -30,6 +30,16 @@ pub struct FormCreds {
 pub struct SessionData {
     pub id: i32,
     pub name: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct JsonSuccess {
+    pub success: String
+}
+
+#[derive(serde::Serialize)]
+pub struct JsonError {
+    pub error: String
 }
 
 pub async fn save_user(db: &DatabaseConnection,

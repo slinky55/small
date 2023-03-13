@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::ops::Deref;
 
 use actix_web::{
@@ -9,20 +8,8 @@ use actix_web::{
     Responder
 };
 
-use actix_web::cookie::{
-    Cookie,
-    Expiration,
-    time::OffsetDateTime,
-    time::Duration,
-    SameSite
-};
-
 use actix_session::Session;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-use jwt::SignWithKey;
 
 use sea_orm::{EntityTrait};
 use sea_orm::entity::prelude::*;
@@ -30,7 +17,7 @@ use sea_orm::entity::prelude::*;
 use entity::prelude::User;
 use entity::user;
 
-use crate::{NewUser, FormCreds, save_user, State, SessionData};
+use crate::{NewUser, FormCreds, save_user, State, SessionData, JsonError};
 
 #[get("/ping")]
 pub async fn ping() -> impl Responder {
@@ -121,8 +108,16 @@ pub async fn user_login(state: web::Data<State>,
     println!("POST /api/user/login 200");
     HttpResponse::Ok().json(SessionData {
         id: user.id,
-        name: user.name,
+        name: user.name
     })
+}
+
+#[get("/user/logout")]
+pub async fn user_logout(session: Session) -> impl Responder {
+    session.purge();
+
+    println!("GET /api/user/logout 200");
+    HttpResponse::Ok().body("Logged out")
 }
 
 #[get("/user/me")]
@@ -131,14 +126,18 @@ pub async fn user_me(session: Session) -> impl Responder {
         Ok(id) => {
             if id.is_none() {
                 println!("GET /api/user/me 401");
-                return HttpResponse::Unauthorized().body("Unauthorized");
+                return HttpResponse::Unauthorized().json(JsonError {
+                    error: "Unauthorized".to_string()
+                })
             }
             id.unwrap()
         },
         Err(err) => {
             eprintln!("Error: {}", err);
             println!("GET /api/user/me 500");
-            return HttpResponse::InternalServerError().body("Internal server error");
+            return HttpResponse::Unauthorized().json(JsonError {
+                error: "Internal server error".to_string()
+            })
         }
     };
 
@@ -146,14 +145,18 @@ pub async fn user_me(session: Session) -> impl Responder {
         Ok(name) => {
             if name.is_none() {
                 println!("GET /api/user/me 401");
-                return HttpResponse::Unauthorized().body("Unauthorized");
+                return HttpResponse::Unauthorized().json(JsonError {
+                    error: "Unauthorized".to_string()
+                })
             }
             name.unwrap()
         },
         Err(err) => {
             eprintln!("Error: {}", err);
             println!("GET /api/user/me 500");
-            return HttpResponse::InternalServerError().body("Internal server error");
+            return HttpResponse::Unauthorized().json(JsonError {
+                error: "Internal server error".to_string()
+            })
         }
     };
 
@@ -166,7 +169,8 @@ pub async fn user_me(session: Session) -> impl Responder {
 
 #[get("/user/profile/{id}")]
 pub async fn user_profile(path: web::Path<i32>,
-                      state: web::Data<State>) -> impl Responder {
+                      state: web::Data<State>) -> impl Responder
+{
     let id = path.into_inner();
     let db = state.db.lock().unwrap();
 

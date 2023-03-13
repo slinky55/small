@@ -1,3 +1,3 @@
 # Small
 
-A blog site similar to medium written in Svelte/Rust.
+A blog site similar to dev.to written in Svelte/Rust.
